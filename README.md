@@ -3,4 +3,4 @@ Final code to accompany the manuscript "Quantifying the relative importance of c
 
 **Repository organization**
 
-:file_folder: **intertidal_model**: code to run the simulation of the rocky intertidal food web, and to partition the influence of variation in the environment and predation on coexistence.
+:file_folder: **intertidal_model**: code to run the simulation of the rocky intertidal food web, and to partition the influence of variation in the environment and predation on coexistence of barnacles and limpets.
