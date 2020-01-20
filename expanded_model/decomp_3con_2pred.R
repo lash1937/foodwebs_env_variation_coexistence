@@ -1,4 +1,6 @@
-#decomposition of 3C and 2P model
+#implementation of the Vasseur and Fox Model with temporal variation in mortality rates
+# Compare positive, no, and negative autocorrelation
+# For tree species mortality rates through time (e.g. from Vasseur and Fox appendix)
 
 rm(list = ls())
 library(deSolve)
@@ -6,69 +8,64 @@ library(here)
 library(foreach)
 library(doSNOW)
 # ----------------------------------------------------------------------------------------------------
+# Run model with both species to get overall dynamics
 
-#Model
-VassFox_2P_3C <- function(Time, State, Pars) {
-  with(as.list(c(State, Pars)), {
-    #variables to make math easier to read
-    
-    all_c_p1 <-
-      ((O_P1_C1 * C1) +  (O_P1_C2 * C2) + (1 - (O_P1_C1 + O_P1_C2)) * C3)
-    
-    
-    all_c_p2 <-
-      ((O_P2_C1 * C1) +  (O_P2_C2 * C2) + (1 - (O_P2_C1 + O_P2_C2)) * C3)
-    
-    both_preds_eat_C1 <-
-      ((O_P1_C1 * J_P1 * P1 * C1) / (all_c_p1 + all_c_p2 + C_0)) + ((O_P2_C1 * J_P2 * P2 * C1) / (all_c_p1 +
-                                                                                                    all_c_p2 + C_0))
-    
-    both_preds_eat_C2 <-
-      ((O_P1_C2 * J_P1 * P1 * C2) / (all_c_p1 + all_c_p2 + C_0)) + ((O_P2_C2 * J_P2 * P2 * C2) / (all_c_p1 +
-                                                                                                    all_c_p2 + C_0))
-    
-    both_preds_eat_C3 <-
-      (((1 - (
-        O_P1_C1 + O_P1_C2
-      )) * J_P1 * P1 * C3) / (all_c_p1 + all_c_p2 + C_0)) + (((1 - (
-        O_P2_C1 + O_P2_C2
-      )) * J_P2 * P2 * C3) / (all_c_p1 + all_c_p2 + C_0))
-    
-    
-    
-    dP1 = -(M_P1 * P1) + (((J_P1 * P1) * ((O_P1_C1 * C1) + (O_P1_C2 * C2) + (
-      1 - (O_P1_C1 + O_P1_C2)
-    ) * C3)) / (all_c_p1 + all_c_p2 + C_0))
-    
-    
-    dP2 = -(M_P2 * P2) + (((J_P2 * P2) * ((O_P2_C1 * C1) + (O_P2_C2 * C2) + (
-      1 - (O_P2_C1 + O_P2_C2)
-    ) * C3)) / (all_c_p1 + all_c_p2 + C_0))
-    
-    
-    dC1 = -(M_C1 * C1) + ((O_C1_R * J_C1 * C1 * R) / (R + R_0_1)) - both_preds_eat_C1
-    dC2 = -(M_C2 * C2) + ((O_C2_R * J_C2 * C2 * R) / (R + R_0_2)) - both_preds_eat_C2
-    dC3 = -(M_C3 * C3) + ((O_C3_R * J_C3 * C3 * R) / (R + R_0_3)) - both_preds_eat_C3
-    
-    dR = r * R * (1 - (R / K)) - ((O_C1_R * J_C1 * C1 * R) / (R + R_0_1)) - ((O_C2_R * J_C2 * C2 * R) / (R + R_0_2)) -  ((O_C3_R * J_C3 * C3 * R) / (R + R_0_3))
-    
-    return(list(c(dP1, dP2, dC1, dC2, dC3, dR)))
-    
-  })
   
-  
-}
-#estimated parameters from 3 con model
-#parameter set 1
-est <-
-  c(0.097798 ,   0.670232  ,  0.297716  ,  0.332333,    0.001743  ,  0.926310)
+  VassFox_2P_3C <- function(Time, State, Pars) {
+    with(as.list(c(State, Pars)), {
+      
+      #variables to make math easier to read
+      
+      all_c_p1 <-
+        ((O_P1_C1 * C1) +  (O_P1_C2 * C2) + (1 - (O_P1_C1 + O_P1_C2)) * C3)
+      
+      
+      all_c_p2 <-
+        ((O_P2_C1 * C1) +  (O_P2_C2 * C2) + (1 - (O_P2_C1 + O_P2_C2)) * C3)
+      
+      both_preds_eat_C1 <-
+        ((O_P1_C1 * J_P1 * P1 * C1) / (all_c_p1 + C_0)) + ((O_P2_C1 * J_P2 * P2 * C1) / (all_c_p2 + C_0_P2))
+      
+      both_preds_eat_C2 <-
+        ((O_P1_C2 * J_P1 * P1 * C2) / (all_c_p1  + C_0)) + ((O_P2_C2 * J_P2 * P2 * C2) / (all_c_p2 + C_0_P2))
+      
+      both_preds_eat_C3 <-
+        (((1 - (
+          O_P1_C1 + O_P1_C2
+        )) * J_P1 * P1 * C3) / (all_c_p1 + C_0)) + (((1 - (
+          O_P2_C1 + O_P2_C2
+        )) * J_P2 * P2 * C3) / (all_c_p2 + C_0_P2))
+      
+      
+      
+      dP1 = -(M_P1 * P1) + (((J_P1 * P1) * (
+        (O_P1_C1 * C1) + (O_P1_C2 * C2) + (1 - (O_P1_C1 + O_P1_C2)) * C3
+      )) / (all_c_p1  + C_0))
+      
+      
+      dP2 = -(M_P2 * P2) + (((J_P2 * P2) * (
+        (O_P2_C1 * C1) + (O_P2_C2 * C2) + (1 - (O_P2_C1 + O_P2_C2)) * C3
+      )) / (all_c_p2 + C_0_P2))
+      
+      
+      dC1 = -(M_C1 * C1) + ((O_C1_R * J_C1 * C1 * R) / (R + R_0_1)) - both_preds_eat_C1
+      dC2 = -(M_C2 * C2) + ((O_C2_R * J_C2 * C2 * R) / (R + R_0_2)) - both_preds_eat_C2
+      dC3 = -(M_C3 * C3) + ((O_C3_R * J_C3 * C3 * R) / (R + R_0_3)) - both_preds_eat_C3
+      
+      dR = r * R * (1 - (R / K)) - ((O_C1_R * J_C1 * C1 * R) / (R + R_0_1)) - ((O_C2_R * J_C2 * C2 * R) / (R + R_0_2)) -  ((O_C3_R * J_C3 * C3 * R) / (R + R_0_3))
+      
+      return(list(c(dP1, dP2, dC1, dC2, dC3, dR)))
+      
+    })
+    
+    
+  }
 
-#parameter set 2
-#est<-c(0.142901 ,   0.917076  ,  0.328642,    0.262048 ,   0.012992,    0.919742)
 
-#parameters estimate from 2 pred model
-est2_pred <- c(0.365359 ,   0.061683 ,   0.384297 ,   0.607627)
+est<-c(0.262571  ,  0.862126  ,  0.227814  ,  0.881397 ,   0.065556 ,   0.533164)
 
+
+est2_pred<-c(0.407796  ,  0.0700288  ,  0.398767  ,  0.129095  ,  0.885837)
 # parameters
 # resource intrinsic rate of growth
 r <- 1.0
@@ -79,7 +76,7 @@ J_C1 <- 0.8036
 # consumer 2 ingestion rate
 J_C2 <- 0.7
 # consumer 3 ingestion rate (estimated)
-J_C3 <- est[2]
+J_C3 <-est[2]
 # predator ingestion rate
 J_P1 <- 0.4
 # predator mortality rate
@@ -94,12 +91,14 @@ M_P2 <- est2_pred[2]
 R_0_1 <- 0.16129
 R_0_2 <- 0.9
 # half saturation constant (estimated)
-R_0_3 <- est[3]
+
+R_0_3 <-est[3]
 C_0 <- 0.5
 # preference coefficient (estimated)
 
+
 O_P1_C1 <- est[4]
-O_P1_C2 <- est[5]
+O_P1_C2 <- est[5] 
 
 O_P2_C1 <- est2_pred[3]
 O_P2_C2 <- est2_pred[4]
@@ -108,19 +107,19 @@ O_P2_C2 <- est2_pred[4]
 O_C1_R <- 1.0
 O_C2_R <- 0.98
 #estimated
-O_C3_R <- est[6]
+
+O_C3_R<-est[6]
+
+C_0_P2<-est2_pred[5]
 time <- 5000
 
-
-# Run to equilibrium
-runtoequal <- function(State_int,
-                       M_C1_temp,
-                       M_C2_temp,
-                       M_C3_temp) {
+runtoequal <- function(State_int, M_C1_temp, M_C2_temp, M_C3_temp) {
+  
+  # Run to equilibrium
   mat <- matrix(data = NA,
                 nrow = time,
                 ncol = 6)
-  mat[1,] <- State_int
+  mat[1, ] <- State_int
   
   for (t in 2:time) {
     M_C1 <- M_C1_temp[t]
@@ -146,6 +145,7 @@ runtoequal <- function(State_int,
         R_0_2 = R_0_2,
         R_0_3 = R_0_3,
         C_0 = C_0,
+	C_0_P2 = C_0_P2,
         O_P1_C1 = O_P1_C1,
         O_P1_C2 = O_P1_C2,
         O_P2_C1 = O_P2_C1,
@@ -157,11 +157,11 @@ runtoequal <- function(State_int,
     # Udate state variables to output from last timestep
     State <- c(
       P1 = mat[t - 1, 1],
-      P2 = mat[t - 1, 2],
+      P2 = mat[t- 1, 2],
       C1 = mat[t - 1, 3],
       C2 = mat[t - 1, 4],
       C3 = mat[t - 1, 5],
-      R = mat[t - 1, 6]
+      R = mat[t-1, 6]
     )
     
     # run ODE solver
@@ -177,8 +177,7 @@ runtoequal <- function(State_int,
       )
     
     # Update results matrix
-    mat[t,] <-
-      c(VF[2, 2], VF[2, 3], VF[2, 4], VF[2, 5], VF[2, 6], VF[2, 7])
+    mat[t, ] <- c(VF[2, 2], VF[2, 3], VF[2, 4], VF[2, 5], VF[2, 6],VF[2, 7])
     
     
   }
@@ -187,87 +186,84 @@ runtoequal <- function(State_int,
 }
 
 
-#sets pred to mean value
-runtoequal_set <-
-  function(State_int,
-           M_C1_temp,
-           M_C2_temp,
-           M_C3_temp,
-           P1,
-           P2) {
-    mat <- matrix(data = NA,
-                  nrow = time,
-                  ncol = 6)
-    mat[1,] <- State_int
+
+runtoequal_set <- function(State_int, M_C1_temp, M_C2_temp, M_C3_temp, P1,P2) {
+  #sets pred to mean value
+  mat <- matrix(data = NA,
+                nrow = time,
+                ncol = 6)
+  mat[1, ] <- State_int
+  
+  for (t in 2:time) {
+    M_C1 <- M_C1_temp[t]
+    M_C2 <- M_C2_temp[t]
+    M_C3 <- M_C3_temp[t]
     
-    for (t in 2:time) {
-      M_C1 <- M_C1_temp[t]
-      M_C2 <- M_C2_temp[t]
-      M_C3 <- M_C3_temp[t]
-      
-      pars <-
-        c(
-          r = r,
-          K = K,
-          J_C1 = J_C1,
-          J_C2 = J_C2,
-          J_C3 = J_C3,
-          J_P1 = J_P1,
-          J_P2 = J_P2,
-          M_C1 = M_C1,
-          M_C2 = M_C2,
-          M_C3 = M_C3,
-          M_P1 = M_P1,
-          M_P2 = M_P2,
-          R_0_1 = R_0_1,
-          R_0_2 = R_0_2,
-          R_0_3 = R_0_3,
-          C_0 = C_0,
-          O_P1_C1 = O_P1_C1,
-          O_P1_C2 = O_P1_C2,
-          O_P2_C1 = O_P2_C1,
-          O_P2_C2 = O_P2_C2,
-          O_C1_R = O_C1_R,
-          O_C2_R = O_C2_R,
-          O_C3_R = O_C3_R
-        )
-      
-      # Udate state variables to output from last timestep
-      State <- c(
-        P1 = P1,
-        P2 = P2,
-        C1 = mat[t - 1, 3],
-        C2 = mat[t - 1, 4],
-        C3 = mat[t - 1, 5],
-        R = mat[t - 1, 6]
+    pars <-
+      c(
+        r = r,
+        K = K,
+        J_C1 = J_C1,
+        J_C2 = J_C2,
+        J_C3 = J_C3,
+        J_P1 = J_P1,
+        J_P2 = J_P2,
+        M_C1 = M_C1,
+        M_C2 = M_C2,
+        M_C3 = M_C3,
+        M_P1 = M_P1,
+        M_P2 = M_P2,
+        R_0_1 = R_0_1,
+        R_0_2 = R_0_2,
+        R_0_3 = R_0_3,
+        C_0 = C_0,
+	C_0_P2 = C_0_P2,
+        O_P1_C1 = O_P1_C1,
+        O_P1_C2 = O_P1_C2,
+        O_P2_C1 = O_P2_C1,
+        O_P2_C2 = O_P2_C2,
+        O_C1_R = O_C1_R,
+        O_C2_R = O_C2_R,
+        O_C3_R = O_C3_R
       )
-      
-      
-      # run ODE solver
-      VF <-
-        as.data.frame(
-          ode(
-            func = VassFox_2P_3C,
-            y = State,
-            parms = pars,
-            times = seq(0, 1)
-          ),
-          events = list(func = eventfun)
-        )
-      
-      # Update results matrix
-      mat[t,] <- c(P1, P2, VF[2, 4], VF[2, 5], VF[2, 6], VF[2, 7])
-      
-    }
-    return(mat)
+    
+    # Udate state variables to output from last timestep
+    State <- c(
+      P1 = P1,
+      P2 = P2,
+      C1 = mat[t - 1, 3],
+      C2 = mat[t - 1, 4],
+      C3 = mat[t - 1, 5],
+      R = mat[t-1, 6]
+    )
+    
+    
+    # run ODE solver
+    VF <-
+      as.data.frame(
+        ode(
+          func = VassFox_2P_3C,
+          y = State,
+          parms = pars,
+          times = seq(0, 1)
+        ),
+        events = list(func = eventfun)
+      )
+    
+    # Update results matrix
+    mat[t, ] <- c(P1,P2, VF[2, 4], VF[2, 5], VF[2, 6], VF[2,7])
     
   }
+  return(mat)
+  
+}
 
-#calculates what happens when C1 invades
+
 invade_C1 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
+  #calculates what happens when C1 invades
   invade_start_time <- time / 2
   
-  
+  # now invade C1
   C1_ldgr <- matrix(
     data = NA,
     nrow = (time - invade_start_time),
@@ -311,6 +307,7 @@ invade_C1 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
         R_0_2 = R_0_2,
         R_0_3 = R_0_3,
         C_0 = C_0,
+	C_0_P2 = C_0_P2,
         O_P1_C1 = O_P1_C1,
         O_P1_C2 = O_P1_C2,
         O_P2_C1 = O_P2_C1,
@@ -323,7 +320,7 @@ invade_C1 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
     # Udate state variables to output from last timestep
     State <- c(
       P1 = mat[t - 1, 1],
-      P2 = mat[t - 1, 2],
+      P2 = mat[t-1, 2],
       C1 = 0.001,
       C2 = mat[t - 1, 4],
       C3 = mat[t - 1, 5],
@@ -349,16 +346,13 @@ invade_C1 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
   
   
   
-  result <-
-    data.frame(C1_ldgr = C1_ldgr,
-               C2_resident = C2_resident,
-               C3_resident = C3_resident)
+  result <- data.frame(C1_ldgr = C1_ldgr, C2_resident = C2_resident, C3_resident= C3_resident)
   return(result)
   
 }
 
-#calculate what happens when C2 invades
 invade_C2 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
+  #calculate what happens when C2 invades
   invade_start_time <- time / 2
   
   # now invade C1
@@ -373,7 +367,7 @@ invade_C2 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
       nrow = (time - invade_start_time),
       ncol = 1
     )
-  C3_resident <-
+  C3_resident<-
     matrix(
       data = NA,
       nrow = (time - invade_start_time),
@@ -389,7 +383,7 @@ invade_C2 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
     M_C3 <- M_C3_temp[t]
     
     
-    pars <-
+      pars <-
       c(
         r = r,
         K = K,
@@ -407,6 +401,7 @@ invade_C2 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
         R_0_2 = R_0_2,
         R_0_3 = R_0_3,
         C_0 = C_0,
+	C_0_P2 = C_0_P2,
         O_P1_C1 = O_P1_C1,
         O_P1_C2 = O_P1_C2,
         O_P2_C1 = O_P2_C1,
@@ -419,7 +414,7 @@ invade_C2 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
     # run ODE solver
     State <- c(
       P1 = mat[t - 1, 1],
-      P2 = mat[t - 1, 2],
+      P2 = mat[t -1, 2],
       C1 = mat[t - 1, 3],
       C2 = .001,
       C3 = mat[t - 1, 5],
@@ -443,16 +438,14 @@ invade_C2 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
     counter <- counter + 1
   }
   
-  result <-
-    data.frame(C2_ldgr = C2_ldgr,
-               C1_resident = C1_resident,
-               C3_resident = C3_resident)
+  result <- data.frame(C2_ldgr = C2_ldgr, C1_resident = C1_resident, C3_resident = C3_resident)
   return(result)
   
 }
 
-#calculate what happens when C3 invades
+
 invade_C3 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
+  #calculate what happens when C3 invades
   invade_start_time <- time / 2
   
   C3_ldgr <- matrix(
@@ -466,7 +459,7 @@ invade_C3 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
       nrow = (time - invade_start_time),
       ncol = 1
     )
-  C2_resident <-
+  C2_resident<-
     matrix(
       data = NA,
       nrow = (time - invade_start_time),
@@ -500,6 +493,7 @@ invade_C3 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
         R_0_2 = R_0_2,
         R_0_3 = R_0_3,
         C_0 = C_0,
+	C_0_P2 = C_0_P2,
         O_P1_C1 = O_P1_C1,
         O_P1_C2 = O_P1_C2,
         O_P2_C1 = O_P2_C1,
@@ -512,7 +506,7 @@ invade_C3 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
     # run ODE solver
     State <- c(
       P1 = mat[t - 1, 1],
-      P2 = mat[t - 1, 2],
+      P2 = mat[t-1, 2],
       C1 = mat[t - 1, 3],
       C2 = mat[t - 1, 4],
       C3 = .001,
@@ -536,26 +530,22 @@ invade_C3 <- function(mat, M_C1_temp, M_C2_temp, M_C3_temp) {
     counter <- counter + 1
   }
   
-  result <-
-    data.frame(C3_ldgr = C3_ldgr,
-               C1_resident = C1_resident,
-               C2_resident = C2_resident)
+  result <- data.frame(C3_ldgr = C3_ldgr, C1_resident = C1_resident, C2_resident = C2_resident)
   return(result)
   
 }
+#you stopped updating stuff here still need to change the runall function
 
 runall <- function(sigma, rho, time) {
   #evaluate all combinations of invaders, wrapped up in a function so that it can be called in parallel
   # ----------------------------------------------------------------------------------------------------
   # starting conditions
-  State <- c(
-    P1 = 1,
-    P2 = 1,
-    C1 = 1,
-    C2 = 1,
-    C3 = 1,
-    R = 1
-  ) # starting parameters
+  State <- c(P1 = 1,
+             P2 = 1,
+             C1 = 1,
+             C2 = 1,
+             C3 = 1,
+             R = 1) # starting parameters
   
   # Calculate temporal variation in mortality timeseries
   z <- matrix(data = rnorm(
@@ -570,10 +560,10 @@ runall <- function(sigma, rho, time) {
            nrow = 2)
   
   g <- cholesky %*% z
-  M_C1_temp <- 0.4 * exp(g[1,])
-  M_C2_temp <- 0.2 * exp(g[2,])
+  M_C1_temp <- 0.4 * exp(g[1, ])
+  M_C2_temp <- 0.2 * exp(g[2, ])
   
-  #reroll the random matrix
+  #reroll the random matrix 
   z <- matrix(data = rnorm(
     n = 2 * time,
     mean = 0,
@@ -583,73 +573,54 @@ runall <- function(sigma, rho, time) {
   g <- cholesky %*% z
   
   #growth rate estimated
-  
-  M_C3_temp <- est[1] * exp(g[1,])
-  
+  #M_C3_temp <- 0.096 * exp(g[1, ]) #set 1
+  #M_C3_temp <- 0.090 * exp(g[1, ]) #set 2
+  #M_C3_temp <- 0.159 * exp(g[1, ]) #set 3
+  M_C3_temp <- est[1] * exp(g[1, ])
+  #results <- runtoequal(State, M_C1_temp, M_C2_temp)
   invade_start_time <- time / 2
   
-  State <- c(
-    P1 = 1,
-    P2 = 1,
-    C1 = 0,
-    C2 = 1,
-    C3 = 1,
-    R = 1
-  ) # starting parameters
+  State <- c(P1 = 1,
+             P2 = 1,
+             C1 = 0,
+             C2 = 1,
+             C3 = 1,
+             R = 1) # starting parameters
   
-  C1_invade_C2_resident_C3_resident <-
-    runtoequal(State, M_C1_temp, M_C2_temp, M_C3_temp)
+  C1_invade_C2_resident_C3_resident <- runtoequal(State, M_C1_temp, M_C2_temp, M_C3_temp)
   # now invade C1
-  invadeC1 <-
-    invade_C1(C1_invade_C2_resident_C3_resident,
-              M_C1_temp,
-              M_C2_temp,
-              M_C3_temp)
+  invadeC1 <- invade_C1(C1_invade_C2_resident_C3_resident, M_C1_temp, M_C2_temp, M_C3_temp)
   C1_ldgr <- invadeC1$C1_ldgr
   C2_resident_C1_invade <- invadeC1$C2_resident
   C3_resident_C1_invade <- invadeC1$C3_resident
   
   # C2 as the invader
-  State <- c(
-    P1 = 1,
-    P2 = 1,
-    C1 = 1,
-    C2 = 0,
-    C3 = 1,
-    R = 1
-  ) # starting parameters
+  State <- c(P1 = 1,
+             P2 = 1,
+             C1 = 1,
+             C2 = 0,
+             C3 = 1,
+             R = 1) # starting parameters
   
-  C2_invade_C1_resident_C3_resident <-
-    runtoequal(State, M_C1_temp, M_C2_temp, M_C3_temp)
+  C2_invade_C1_resident_C3_resident <- runtoequal(State, M_C1_temp, M_C2_temp,M_C3_temp)
   # now invade C2
-  invadeC2 <-
-    invade_C2(C2_invade_C1_resident_C3_resident,
-              M_C1_temp,
-              M_C2_temp,
-              M_C3_temp)
+  invadeC2 <- invade_C2(C2_invade_C1_resident_C3_resident, M_C1_temp, M_C2_temp, M_C3_temp)
   C2_ldgr <- invadeC2$C2_ldgr
   
   C1_resident_C2_invade <- invadeC2$C1_resident
   C3_resident_C2_invade <- invadeC2$C3_resident
   
   # C3 as the invader
-  State <- c(
-    P1 = 1,
-    P2 = 1,
-    C1 = 1,
-    C2 = 1,
-    C3 = 0,
-    R = 1
-  ) # starting parameters
+  State <- c(P1 = 1,
+             P2 = 1,
+             C1 = 1,
+             C2 = 1,
+             C3 = 0,
+             R = 1) # starting parameters
   
-  C3_invade_C1_resident_C2_resident <-
-    runtoequal(State, M_C1_temp, M_C2_temp, M_C3_temp)
+  C3_invade_C1_resident_C2_resident <- runtoequal(State, M_C1_temp, M_C2_temp,M_C3_temp)
   # now invade C3
-  invadeC3 <-
-    invade_C3(C3_invade_C1_resident_C2_resident,
-              M_C1_temp,
-              M_C2_temp,
-              M_C3_temp)
+  invadeC3 <- invade_C3(C3_invade_C1_resident_C2_resident, M_C1_temp, M_C2_temp, M_C3_temp)
   C3_ldgr <- invadeC3$C3_ldgr
   
   C1_resident_C3_invade <- invadeC3$C1_resident
@@ -658,19 +629,13 @@ runall <- function(sigma, rho, time) {
   
   
   
-  # calculate r_bar ( not sure about R_bar calculations here) what is the right thing to do here?
+  # calculate r_bar ( not sure about R_bar calculations here) what is the right thing to do here? 
   # ----------------------------------------------------------------------------------------------------
   
   
-  C1_r_bar <-
-    mean(C1_ldgr) - (mean(C2_resident_C1_invade) + mean(C3_resident_C1_invade)) /
-    2
-  C2_r_bar <-
-    mean(C2_ldgr) - (mean(C1_resident_C2_invade) + mean(C3_resident_C2_invade)) /
-    2
-  C3_r_bar <-
-    mean(C3_ldgr) - (mean(C1_resident_C3_invade) + mean(C2_resident_C3_invade)) /
-    2
+  C1_r_bar <- mean(C1_ldgr) - (mean(C2_resident_C1_invade)+mean(C3_resident_C1_invade))/2
+  C2_r_bar <- mean(C2_ldgr) - (mean(C1_resident_C2_invade)+mean(C3_resident_C2_invade))/2
+  C3_r_bar <- mean(C3_ldgr) - (mean(C1_resident_C3_invade)+mean(C2_resident_C3_invade))/2
   # ----------------------------------------------------------------------------------------------------
   # Partitioning coexistence mechanisms
   # set up non-fluctuating conditions
@@ -703,34 +668,29 @@ runall <- function(sigma, rho, time) {
   
   # C1 as the invader
   State <-
-    c(
-      P1 = avg_predator1_C1_invade_C2_resident_C3_resident,
+    c(P1 = avg_predator1_C1_invade_C2_resident_C3_resident,
       P2 = avg_predator2_C1_invade_C2_resident_C3_resident,
       C1 = 0,
       C2 = 1,
       C3 = 1,
-      R = 1
-    ) # starting parameters
+      R = 1) # starting parameters
   
-  #easier to just rep the ave rather then write a new runtoequal with the mean set function
+  
   epsilon_0_C1_invade_C2_resident_C3_resident <-
     runtoequal_set(
       State,
       rep(avg_M_C1, length(M_C1_temp)),
       rep(avg_M_C2, length(M_C2_temp)),
       rep(avg_M_C3, length(M_C3_temp)),
-      avg_predator1_C1_invade_C2_resident_C3_resident,
-      avg_predator2_C1_invade_C2_resident_C3_resident
+      avg_predator1_C1_invade_C2_resident_C3_resident,avg_predator2_C1_invade_C2_resident_C3_resident
     )
   
   # now invade C1
   invadeC1 <-
-    invade_C1(
-      epsilon_0_C1_invade_C2_resident_C3_resident,
-      rep(avg_M_C1, length(M_C1_temp)),
-      rep(avg_M_C2, length(M_C2_temp)),
-      rep(avg_M_C2, length(M_C2_temp))
-    )
+    invade_C1(epsilon_0_C1_invade_C2_resident_C3_resident,
+              rep(avg_M_C1, length(M_C1_temp)),
+              rep(avg_M_C2, length(M_C2_temp)),
+              rep(avg_M_C2, length(M_C2_temp)))
   
   
   C1_epsilon_0 <- invadeC1$C1_ldgr
@@ -739,14 +699,12 @@ runall <- function(sigma, rho, time) {
   
   # C2 as the invader
   State <-
-    c(
-      P1 = avg_predator1_C2_invade_C1_resident_C3_resident,
+    c(P1 = avg_predator1_C2_invade_C1_resident_C3_resident,
       P2 = avg_predator2_C2_invade_C1_resident_C3_resident,
       C1 = 1,
       C2 = 0,
-      C3 = 1,
-      R = 1
-    ) # starting parameters
+      C3 =1,
+      R = 1) # starting parameters
   
   epsilon_0_C2_invade_C1_resident_C3_resident <-
     runtoequal_set(
@@ -754,18 +712,15 @@ runall <- function(sigma, rho, time) {
       rep(avg_M_C1, length(M_C1_temp)),
       rep(avg_M_C2, length(M_C2_temp)),
       rep(avg_M_C3, length(M_C3_temp)),
-      avg_predator1_C2_invade_C1_resident_C3_resident,
-      avg_predator2_C2_invade_C1_resident_C3_resident
+      avg_predator1_C2_invade_C1_resident_C3_resident,avg_predator2_C2_invade_C1_resident_C3_resident
     )
   
   # now invade C2
   invadeC2 <-
-    invade_C2(
-      epsilon_0_C2_invade_C1_resident_C3_resident,
-      rep(avg_M_C1, length(M_C1_temp)),
-      rep(avg_M_C2, length(M_C2_temp)),
-      rep(avg_M_C3, length(M_C3_temp))
-    )
+    invade_C2(epsilon_0_C2_invade_C1_resident_C3_resident,
+              rep(avg_M_C1, length(M_C1_temp)),
+              rep(avg_M_C2, length(M_C2_temp)),
+              rep(avg_M_C3, length(M_C3_temp)))
   
   C2_epsilon_0 <- invadeC2$C2_ldgr
   C1_resident_epsilon_0_invade_C2 <- invadeC2$C1_resident
@@ -775,14 +730,12 @@ runall <- function(sigma, rho, time) {
   
   # C3 as the invader
   State <-
-    c(
-      P1 = avg_predator1_C3_invade_C1_resident_C2_resident,
+    c(P1 = avg_predator1_C3_invade_C1_resident_C2_resident,
       P2 = avg_predator2_C3_invade_C1_resident_C2_resident,
       C1 = 1,
       C2 = 1,
-      C3 = 0,
-      R = 1
-    ) # starting parameters
+      C3 =0,
+      R = 1) # starting parameters
   
   epsilon_0_C3_invade_C1_resident_C2_resident <-
     runtoequal_set(
@@ -790,18 +743,15 @@ runall <- function(sigma, rho, time) {
       rep(avg_M_C1, length(M_C1_temp)),
       rep(avg_M_C2, length(M_C2_temp)),
       rep(avg_M_C3, length(M_C3_temp)),
-      avg_predator1_C3_invade_C1_resident_C2_resident,
-      avg_predator2_C3_invade_C1_resident_C2_resident
+      avg_predator1_C3_invade_C1_resident_C2_resident,avg_predator2_C3_invade_C1_resident_C2_resident
     )
   
   # now invade C3
   invadeC3 <-
-    invade_C3(
-      epsilon_0_C3_invade_C1_resident_C2_resident,
-      rep(avg_M_C1, length(M_C1_temp)),
-      rep(avg_M_C2, length(M_C2_temp)),
-      rep(avg_M_C3, length(M_C3_temp))
-    )
+    invade_C3(epsilon_0_C3_invade_C1_resident_C2_resident,
+              rep(avg_M_C1, length(M_C1_temp)),
+              rep(avg_M_C2, length(M_C2_temp)),
+              rep(avg_M_C3, length(M_C3_temp)))
   
   C3_epsilon_0 <- invadeC3$C3_ldgr
   C1_resident_epsilon_0_invade_C3 <- invadeC3$C1_resident
@@ -809,50 +759,36 @@ runall <- function(sigma, rho, time) {
   
   
   
-  #
+  #again, I'm not sure how to deal with 3 terms
   # ----------------------------------------------------------------------------------------------------
   
-  C1_delta_0 <-
-    mean(C1_epsilon_0) - (mean(C2_resident_epsilon_0_invade_C1) + mean(C3_resident_epsilon_0_invade_C1)) /
-    2
-  C2_delta_0 <-
-    mean(C2_epsilon_0) - (mean(C1_resident_epsilon_0_invade_C2) + mean(C3_resident_epsilon_0_invade_C2)) /
-    2
-  C3_delta_0 <-
-    mean(C3_epsilon_0) - (mean(C1_resident_epsilon_0_invade_C3) + mean(C2_resident_epsilon_0_invade_C3)) /
-    2
+  C1_delta_0 <- mean(C1_epsilon_0) - (mean(C2_resident_epsilon_0_invade_C1)+mean(C3_resident_epsilon_0_invade_C1))/2
+  C2_delta_0 <- mean(C2_epsilon_0) - (mean(C1_resident_epsilon_0_invade_C2)+mean(C3_resident_epsilon_0_invade_C2))/2
+  C3_delta_0 <- mean(C3_epsilon_0) - (mean(C1_resident_epsilon_0_invade_C3)+mean(C2_resident_epsilon_0_invade_C3))/2
   
   # ----------------------------------------------------------------------------------------------------
   # calculate delta_E
   
   # C1 as the invader
   State <-
-    c(
-      P1 = avg_predator1_C1_invade_C2_resident_C3_resident,
+    c(P1 = avg_predator1_C1_invade_C2_resident_C3_resident,
       P2 = avg_predator2_C1_invade_C2_resident_C3_resident,
       C1 = 0,
       C2 = 1,
       C3 = 1,
-      R = 1
-    ) # starting parameters
+      R = 1) # starting parameters
   
   
   epsilon_E_C1_invade_C2_resident_C3_resident <-
-    runtoequal_set(
-      State,
-      M_C1_temp,
-      M_C2_temp,
-      M_C3_temp,
-      avg_predator1_C1_invade_C2_resident_C3_resident,
-      avg_predator2_C1_invade_C2_resident_C3_resident
-    )
+    runtoequal_set(State,
+                   M_C1_temp,
+                   M_C2_temp,
+                   M_C3_temp,
+                   avg_predator1_C1_invade_C2_resident_C3_resident,avg_predator2_C1_invade_C2_resident_C3_resident)
   
   # now invade C1
   invadeC1 <-
-    invade_C1(epsilon_E_C1_invade_C2_resident_C3_resident,
-              M_C1_temp,
-              M_C2_temp,
-              M_C3_temp)
+    invade_C1(epsilon_E_C1_invade_C2_resident_C3_resident, M_C1_temp, M_C2_temp, M_C3_temp)
   
   
   C1_epsilon_E <- invadeC1$C1_ldgr
@@ -863,30 +799,22 @@ runall <- function(sigma, rho, time) {
   
   # C2 as the invader
   State <-
-    c(
-      P1 = avg_predator1_C2_invade_C1_resident_C3_resident,
+    c(P1 = avg_predator1_C2_invade_C1_resident_C3_resident,
       P2 = avg_predator2_C2_invade_C1_resident_C3_resident,
       C1 = 1,
       C2 = 0,
       C3 = 1,
-      R = 1
-    )
+      R = 1) 
   
   epsilon_E_C2_invade_C1_resident_C3_resident <-
-    runtoequal_set(
-      State,
-      M_C1_temp,
-      M_C2_temp,
-      M_C3_temp,
-      avg_predator1_C2_invade_C1_resident_C3_resident,
-      avg_predator2_C2_invade_C1_resident_C3_resident
-    )
+    runtoequal_set(State,
+                   M_C1_temp,
+                   M_C2_temp,
+                   M_C3_temp,
+                   avg_predator1_C2_invade_C1_resident_C3_resident,avg_predator2_C2_invade_C1_resident_C3_resident)
   # now invade C2
   invadeC2 <-
-    invade_C2(epsilon_E_C2_invade_C1_resident_C3_resident,
-              M_C1_temp,
-              M_C2_temp,
-              M_C3_temp)
+    invade_C2(epsilon_E_C2_invade_C1_resident_C3_resident, M_C1_temp, M_C2_temp, M_C3_temp)
   C2_epsilon_E <- invadeC2$C2_ldgr
   
   C1_resident_epsilon_E_invade_C2 <- invadeC2$C1_resident
@@ -895,30 +823,22 @@ runall <- function(sigma, rho, time) {
   
   # C3 as the invader
   State <-
-    c(
-      P1 = avg_predator1_C3_invade_C1_resident_C2_resident,
+    c(P1 = avg_predator1_C3_invade_C1_resident_C2_resident,
       P2 = avg_predator2_C3_invade_C1_resident_C2_resident,
       C1 = 1,
       C2 = 1,
       C3 = 0,
-      R = 1
-    )
+      R = 1) 
   
   epsilon_E_C3_invade_C1_resident_C2_resident <-
-    runtoequal_set(
-      State,
-      M_C1_temp,
-      M_C2_temp,
-      M_C3_temp,
-      avg_predator1_C3_invade_C1_resident_C2_resident,
-      avg_predator1_C3_invade_C1_resident_C2_resident
-    )
+    runtoequal_set(State,
+                   M_C1_temp,
+                   M_C2_temp,
+                   M_C3_temp,
+                   avg_predator1_C3_invade_C1_resident_C2_resident,avg_predator1_C3_invade_C1_resident_C2_resident)
   # now invade C3
   invadeC3 <-
-    invade_C3(epsilon_E_C3_invade_C1_resident_C2_resident,
-              M_C1_temp,
-              M_C2_temp,
-              M_C3_temp)
+    invade_C3(epsilon_E_C3_invade_C1_resident_C2_resident, M_C1_temp, M_C2_temp, M_C3_temp)
   C3_epsilon_E <- invadeC3$C3_ldgr
   
   C1_resident_epsilon_E_invade_C3 <- invadeC3$C1_resident
@@ -928,14 +848,11 @@ runall <- function(sigma, rho, time) {
   
   
   C1_delta_E <-
-    mean(C1_epsilon_E) - (mean(C2_resident_epsilon_E_invade_C1) + mean(C3_resident_epsilon_E_invade_C1)) /
-    2 - C1_delta_0
+    mean(C1_epsilon_E) - (mean(C2_resident_epsilon_E_invade_C1)+mean(C3_resident_epsilon_E_invade_C1))/2 - C1_delta_0
   C2_delta_E <-
-    mean(C2_epsilon_E) - (mean(C1_resident_epsilon_E_invade_C2) + mean(C3_resident_epsilon_E_invade_C2)) /
-    2 - C2_delta_0
+    mean(C2_epsilon_E) - (mean(C1_resident_epsilon_E_invade_C2)+mean(C3_resident_epsilon_E_invade_C2))/2 - C2_delta_0
   C3_delta_E <-
-    mean(C3_epsilon_E) - (mean(C1_resident_epsilon_E_invade_C3) + mean(C2_resident_epsilon_E_invade_C3)) /
-    2 - C3_delta_0
+    mean(C3_epsilon_E) - (mean(C1_resident_epsilon_E_invade_C3)+mean(C2_resident_epsilon_E_invade_C3))/2 - C3_delta_0
   
   
   
@@ -945,30 +862,23 @@ runall <- function(sigma, rho, time) {
   # predator population size varies, but mortality remains constant
   
   # C1 as the invader
-  State <- c(
-    P1 = 1,
-    P2 = 1,
-    C1 = 0,
-    C2 = 1,
-    C3 = 1,
-    R = 1
-  )
+  State <- c(P1 = 1,
+             P2 = 1,
+             C1 = 0,
+             C2 = 1,
+             C3 = 1,
+             R = 1) 
   
   epsilon_P_C1_invade_C2_resident_C3_resident <-
-    runtoequal(State,
-               rep(avg_M_C1, length(M_C1_temp)),
-               rep(avg_M_C2, length(M_C2_temp)),
-               rep(avg_M_C3, length(M_C3_temp)))
+    runtoequal(State, rep(avg_M_C1, length(M_C1_temp)), rep(avg_M_C2, length(M_C2_temp)),rep(avg_M_C3, length(M_C3_temp)) )
   
   
   # now invade C1
   invadeC1 <-
-    invade_C1(
-      epsilon_P_C1_invade_C2_resident_C3_resident,
-      rep(avg_M_C1, length(M_C1_temp)),
-      rep(avg_M_C2, length(M_C2_temp)),
-      rep(avg_M_C3, length(M_C3_temp))
-    )
+    invade_C1(epsilon_P_C1_invade_C2_resident_C3_resident,
+              rep(avg_M_C1, length(M_C1_temp)),
+              rep(avg_M_C2, length(M_C2_temp)),
+              rep(avg_M_C3, length(M_C3_temp)))
   
   C1_epsilon_P <- invadeC1$C1_ldgr
   
@@ -978,29 +888,22 @@ runall <- function(sigma, rho, time) {
   
   
   # C2 as the invader
-  State <- c(
-    P1 = 1,
-    P2 = 1,
-    C1 = 1,
-    C2 = 0,
-    C3 = 1,
-    R = 1
-  ) # starting parameters
+  State <- c(P1 = 1,
+             P2 = 1,
+             C1 = 1,
+             C2 = 0,
+             C3 = 1,
+             R = 1) # starting parameters
   
   epsilon_P_C2_invade_C1_resident_C3_resident <-
-    runtoequal(State,
-               rep(avg_M_C1, length(M_C1_temp)),
-               rep(avg_M_C2, length(M_C2_temp)),
-               rep(avg_M_C3, length(M_C3_temp)))
+    runtoequal(State, rep(avg_M_C1, length(M_C1_temp)), rep(avg_M_C2, length(M_C2_temp)),rep(avg_M_C3, length(M_C3_temp)))
   
   # now invade C2
   invadeC2 <-
-    invade_C2(
-      epsilon_P_C2_invade_C1_resident_C3_resident ,
-      rep(avg_M_C1, length(M_C1_temp)),
-      rep(avg_M_C2, length(M_C2_temp)),
-      rep(avg_M_C3, length(M_C3_temp))
-    )
+    invade_C2(epsilon_P_C2_invade_C1_resident_C3_resident ,
+              rep(avg_M_C1, length(M_C1_temp)),
+              rep(avg_M_C2, length(M_C2_temp)),
+              rep(avg_M_C3, length(M_C3_temp)))
   
   
   C2_epsilon_P <- invadeC2$C2_ldgr
@@ -1011,29 +914,22 @@ runall <- function(sigma, rho, time) {
   
   
   # C3 as the invader
-  State <- c(
-    P1 = 1,
-    P2 = 1,
-    C1 = 1,
-    C2 = 1,
-    C3 = 0,
-    R = 1
-  ) # starting parameters
+  State <- c(P1 = 1,
+             P2 = 1,
+             C1 = 1,
+             C2 = 1,
+             C3 = 0,
+             R = 1) # starting parameters
   
   epsilon_P_C3_invade_C1_resident_C2_resident <-
-    runtoequal(State,
-               rep(avg_M_C1, length(M_C1_temp)),
-               rep(avg_M_C2, length(M_C2_temp)),
-               rep(avg_M_C3, length(M_C3_temp)))
+    runtoequal(State, rep(avg_M_C1, length(M_C1_temp)), rep(avg_M_C2, length(M_C2_temp)),rep(avg_M_C3, length(M_C3_temp)))
   
   # now invade C2
   invadeC3 <-
-    invade_C3(
-      epsilon_P_C3_invade_C1_resident_C2_resident ,
-      rep(avg_M_C1, length(M_C1_temp)),
-      rep(avg_M_C2, length(M_C2_temp)),
-      rep(avg_M_C3, length(M_C3_temp))
-    )
+    invade_C3(epsilon_P_C3_invade_C1_resident_C2_resident ,
+              rep(avg_M_C1, length(M_C1_temp)),
+              rep(avg_M_C2, length(M_C2_temp)),
+              rep(avg_M_C3, length(M_C3_temp)))
   
   
   C3_epsilon_P <- invadeC3$C3_ldgr
@@ -1046,15 +942,12 @@ runall <- function(sigma, rho, time) {
   # ----------------------------------------------------------------------------------------------------
   
   C1_delta_P <-
-    mean(C1_epsilon_P) - (mean(C2_resident_epsilon_P_invade_C1) + mean(C3_resident_epsilon_P_invade_C1)) /
-    2 - C1_delta_0
+    mean(C1_epsilon_P) - (mean(C2_resident_epsilon_P_invade_C1)+mean(C3_resident_epsilon_P_invade_C1))/2 - C1_delta_0
   C2_delta_P <-
-    mean(C2_epsilon_P) - (mean(C1_resident_epsilon_P_invade_C2) + mean(C3_resident_epsilon_E_invade_C2)) /
-    2 - C2_delta_0
+    mean(C2_epsilon_P) - (mean(C1_resident_epsilon_P_invade_C2)+mean(C3_resident_epsilon_E_invade_C2))/2 - C2_delta_0
   
   C3_delta_P <-
-    mean(C3_epsilon_P) - (mean(C1_resident_epsilon_P_invade_C3) + mean(C1_resident_epsilon_E_invade_C3)) /
-    2 - C3_delta_0
+    mean(C3_epsilon_P) - (mean(C1_resident_epsilon_P_invade_C3)+mean(C1_resident_epsilon_E_invade_C3))/2 - C3_delta_0
   
   
   # ----------------------------------------------------------------------------------------------------
@@ -1089,7 +982,7 @@ sigma <- 0.55
 # cross-correlation of C1 and C2
 rho <- 0
 
-#set up for parallization, change the number based on how many cores your machine has. Most personal laptops have 4 or 8. If you don't know how many you have its probably 4. If you have a fancy cluster crank this up to like 100.
+#set up for parallization, change the number based on how many cores your machine has. Most personal laptops have 4 or 8. If you don't know how many you have its probably 4. If you have a fancy cluster crank this up to like 100.  
 cluster = makeCluster(100, type = "SOCK")
 registerDoSNOW(cluster)
 # looping over multiple runs
@@ -1135,19 +1028,20 @@ colnames(C3_final_mechanisms) <-
 
 write.csv(
   C1_final_mechanisms,
-  file = here("C1_final_mechanisms_3con_2pred.csv"),
+  file= here("C1_final_mechanisms_3con_2pred_winner1_review.csv"),
   row.names = FALSE
 )
 write.csv(
   C2_final_mechanisms,
-  file = here("C2_final_mechanisms_3con_2pred.csv"),
+  file = here("C2_final_mechanisms_3con_2pred_winner1_review.csv"),
   row.names = FALSE
 )
 write.csv(
   C3_final_mechanisms,
-  file = here("C3_final_mechanisms_3con_2pred.csv"),
+  file = here("C3_final_mechanisms_3con_2pred_winner1_review.csv"),
   row.names = FALSE
 )
 
-#release the cores we used, this is important! Always remember to run this step if you have created a cluster, or else your cores won't be released until you restart the R session.
+#release the cores we used, this is important! Always remember to run this step if you have created a cluster, or else your cores won't be released until you restart the R session. 
 stopCluster(cluster)
+
