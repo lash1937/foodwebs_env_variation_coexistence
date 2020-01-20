@@ -211,12 +211,8 @@ optimize_function <- function(pars) {
 #these parameters were estimated using estimate_3con_parameters.R, just comment out whichever one you dont want to draw
 
 #parameter set 1
-est <-
-  c(0.097798 ,   0.670232  ,  0.297716  ,  0.332333,    0.001743  ,  0.926310)
-
-#parameter set 2
-#est<-c(0.142901 ,   0.917076  ,  0.328642,    0.262048 ,   0.012992,    0.919742)
-
+est <-c(0.262571  ,  0.862126  ,  0.227814  ,  0.881397 ,   0.065556 ,   0.533164) 
+  
 
 #call the function to get dyanmics
 p <- optimize_function(est)
