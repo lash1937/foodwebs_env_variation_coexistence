@@ -16,11 +16,11 @@ library(compiler)
 #function plots resuls using parameters from optimization, the code is basically the same except the data is returned rather than a score
 optimize_function <- function(pars) {
   #these parameters came from estimating the system with 3 cons and 1 pred
-  pars_from_3_system <-
-    c(0.097798 ,   0.670232  ,  0.297716  ,  0.332333,    0.001743  ,  0.926310)
+ pars_from_3_system<-c(0.262571  ,  0.862126  ,  0.227814  ,  0.881397 ,   0.065556 ,   0.533164) #    0.407796    0.069552    0.398767    0.129095    0.884837
   
   VassFox_2P_3C <- function(Time, State, Pars) {
     with(as.list(c(State, Pars)), {
+      
       #variables to make math easier to read
       
       all_c_p1 <-
@@ -31,30 +31,28 @@ optimize_function <- function(pars) {
         ((O_P2_C1 * C1) +  (O_P2_C2 * C2) + (1 - (O_P2_C1 + O_P2_C2)) * C3)
       
       both_preds_eat_C1 <-
-        ((O_P1_C1 * J_P1 * P1 * C1) / (all_c_p1 + all_c_p2 + C_0)) + ((O_P2_C1 * J_P2 * P2 * C1) / (all_c_p1 +
-                                                                                                      all_c_p2 + C_0))
+        ((O_P1_C1 * J_P1 * P1 * C1) / (all_c_p1 + C_0)) + ((O_P2_C1 * J_P2 * P2 * C1) / (all_c_p2 + C_0_P2))
       
       both_preds_eat_C2 <-
-        ((O_P1_C2 * J_P1 * P1 * C2) / (all_c_p1 + all_c_p2 + C_0)) + ((O_P2_C2 * J_P2 * P2 * C2) / (all_c_p1 +
-                                                                                                      all_c_p2 + C_0))
+        ((O_P1_C2 * J_P1 * P1 * C2) / (all_c_p1  + C_0)) + ((O_P2_C2 * J_P2 * P2 * C2) / (all_c_p2 + C_0_P2))
       
       both_preds_eat_C3 <-
         (((1 - (
           O_P1_C1 + O_P1_C2
-        )) * J_P1 * P1 * C3) / (all_c_p1 + all_c_p2 + C_0)) + (((1 - (
+        )) * J_P1 * P1 * C3) / (all_c_p1 + C_0)) + (((1 - (
           O_P2_C1 + O_P2_C2
-        )) * J_P2 * P2 * C3) / (all_c_p1 + all_c_p2 + C_0))
+        )) * J_P2 * P2 * C3) / (all_c_p2 + C_0_P2))
       
       
       
       dP1 = -(M_P1 * P1) + (((J_P1 * P1) * (
         (O_P1_C1 * C1) + (O_P1_C2 * C2) + (1 - (O_P1_C1 + O_P1_C2)) * C3
-      )) / (all_c_p1 + all_c_p2 + C_0))
+      )) / (all_c_p1  + C_0))
       
       
       dP2 = -(M_P2 * P2) + (((J_P2 * P2) * (
         (O_P2_C1 * C1) + (O_P2_C2 * C2) + (1 - (O_P2_C1 + O_P2_C2)) * C3
-      )) / (all_c_p1 + all_c_p2 + C_0))
+      )) / (all_c_p2 + C_0_P2))
       
       
       dC1 = -(M_C1 * C1) + ((O_C1_R * J_C1 * C1 * R) / (R + R_0_1)) - both_preds_eat_C1
@@ -71,34 +69,24 @@ optimize_function <- function(pars) {
   }
   
   
-  # strength of env. on mortality rate, change if you want to plot with env. variation
-  #sigma <- 0.55
-  sigma <- 0
+  # strength of env. on mortality rate
+  sigma <- .55
+  #sigma<-0
   # cross-correlation of C1 and C2
   ro <- 0
   
-  z <- matrix(data = rnorm(
-    n = 2 * 5000,
-    mean = 0,
-    sd = 1
-  ), nrow = 2)
-  cholesky <-
-    matrix(data = c(sigma ^ 2, ro * (sigma ^ 2), ro * (sigma ^ 2), sigma ^
-                      2),
-           nrow = 2)
+  z <- matrix(data = rnorm(n = 2*5000, mean = 0, sd = 1), nrow = 2)
+  cholesky <- matrix(data = c(sigma^2, ro * (sigma ^2), ro * (sigma ^2), sigma ^2),
+                     nrow = 2)
   g <- cholesky %*% z
-  M_C1_temp <- 0.4 * exp(g[1, ])
-  M_C2_temp <- 0.2 * exp(g[2, ])
+  M_C1_temp <- 0.4 * exp(g[1,])
+  M_C2_temp <- 0.2 * exp(g[2,])
   
   #redraw fluxs for C3, rather then make a 3x matrix, its easier to do this.
-  z <- matrix(data = rnorm(
-    n = 2 * 5000,
-    mean = 0,
-    sd = 1
-  ), nrow = 2)
+  z <- matrix(data = rnorm(n = 2*5000, mean = 0, sd = 1), nrow = 2)
   g <- cholesky %*% z
   
-  M_C3_temp <- pars_from_3_system[1] * exp(g[1, ])
+  M_C3_temp <- pars_from_3_system[1] * exp(g[1,])
   
   
   
@@ -112,8 +100,8 @@ optimize_function <- function(pars) {
   J_C1 <- 0.8036
   # consumer 2 ingestion rate
   J_C2 <- 0.7
-  # consumer 3 ingestion rate
-  J_C3 <- pars_from_3_system[2]
+  #
+  J_C3<- pars_from_3_system[2]
   # predator1 ingestion rate
   J_P1 <- 0.4
   # predator1 mortality rate
@@ -138,6 +126,8 @@ optimize_function <- function(pars) {
   O_P2_C1 <- pars[3]
   O_P2_C2 <- pars[4]
   
+  #half cons for pred 2
+  C_0_P2<-pars[5]
   
   O_C1_R <- 1.0
   O_C2_R <- 0.98
@@ -145,28 +135,26 @@ optimize_function <- function(pars) {
   #O_C3_R <- 0.9
   time <- 5000
   
-  if (O_P1_C1 + O_P1_C2 >= 1) {
+  if(O_P1_C1 + O_P1_C2 >.95 ){
     return(Inf)
   }
   
-  if (O_P2_C1 + O_P2_C2 >= 1) {
+  if(O_P2_C1 + O_P2_C2 >.95 ){
     return(Inf)
   }
   
   State <-
-    c(
-      P1 = 1,
-      P2 = 1,
+    c(P1 =1,
+      P2 =1,
       C1 = 1,
       C2 = 1,
-      C3 = 1,
-      R = 1
-    ) # starting parameters
+      C3 =1,
+      R = 1) # starting parameters
   
   mat <- matrix(data = NA,
                 nrow = time,
                 ncol = 6)
-  mat[1, ] <- State
+  mat[1,] <- State
   
   for (t in 2:time) {
     M_C1 <- M_C1_temp[t]
@@ -191,6 +179,7 @@ optimize_function <- function(pars) {
         R_0_2 = R_0_2,
         R_0_3 = R_0_3,
         C_0 = C_0,
+        C_0_P2 = C_0_P2,
         O_P1_C1 = O_P1_C1,
         O_P1_C2 = O_P1_C2,
         O_P2_C1 = O_P2_C1,
@@ -199,6 +188,7 @@ optimize_function <- function(pars) {
         O_C2_R = O_C2_R,
         O_C3_R = O_C3_R
       )
+    
     
     # Udate state variables to output from last timestep
     State <- c(
@@ -264,10 +254,12 @@ optimize_function <- function(pars) {
 }
 
 #parameters for pred 2 from 3con 2pred parameter estimation
-est <- c(0.365359 ,   0.061683 ,   0.384297 ,   0.607627)
+est<-c(0.407796  ,  0.0700288  ,  0.398767  ,  0.129095  ,  0.885837)
 
-#call ploting function
+
+
 p <- optimize_function(est)
+
 
 
 dat <-
@@ -287,7 +279,7 @@ suppressMessages({
 d$time <- c(rep(seq(1, 5000), 6))
 
 #graph only after 1000
-d <- d[d$time > 999,]
+d <- d[d$time > 1000,]
 
 #put each species in its own plot (this makes them easy to look at 1 by 1 if you want)
 g <-
@@ -332,7 +324,7 @@ pp <- plot_grid(
 
 #save image
 save_plot(
-  "3con_2pred_dynamics.pdf",
+  "3con_2pred_dynamics_reviews_final_var.pdf",
   plot = pp,
   base_height = 12,
   units = "in"
